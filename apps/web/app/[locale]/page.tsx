@@ -99,7 +99,14 @@ export default function SahiDawaHome() {
                             className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 shadow-sm sm:h-10 sm:w-10"
                             aria-label="SahiDawa Logo"
                         >
-                            <ShieldCheck size={24} strokeWidth={2.5} />
+                            <img
+                                src="/favicon.ico"
+                                alt=""
+                                aria-hidden="true"
+                                className="h-7 w-7 object-contain"
+                                width={28}
+                                height={28}
+                            />
                         </div>
                         <h1 className="text-xl font-extrabold tracking-tight text-slate-800 md:text-2xl">
                             SahiDawa
