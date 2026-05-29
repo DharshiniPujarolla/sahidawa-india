@@ -470,6 +470,9 @@ function ResultActions({ onScanAgain, onShare }: { onScanAgain: () => void; onSh
 }
 
 export default function ScanPage() {
+    // Add these near the top of your component, inside the main function
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
     const { isOffline, registerRetryCallback, unregisterRetryCallback } = useOfflineStatus();
     const abortControllerRef = useRef<AbortController | null>(null);
     const isMountedRef = useRef(true);
@@ -896,16 +899,27 @@ export default function ScanPage() {
         }
     };
 
-    /** Handles a barcode scanned via the live camera scanner. */
-    const handleBarcodeScan = useCallback(
-        (barcodeText: string) => {
-            setBatchInput(barcodeText);
-            setIsCameraActive(false);
-            toast.success(`Barcode detected: ${barcodeText} — verifying…`);
-            handleVerify(barcodeText);
-        },
-        [handleVerify]
-    );
+
+   // 1. Add 'async' right before (scannedText
+  const handleBarcodeScan = async (scannedText: string) => { 
+    // 2. Keep these two lines to start the loader
+    setIsVerifying(true);
+    setApiError(null);
+
+    try {
+      // 3. PUT YOUR UNCOMMENTED REAL CODE HERE
+      // (It will look something like this)
+      await handleVerify(scannedText); 
+      
+    } catch (error: any) {
+      // 4. If the real database fails, show the error screen
+      setApiError(error.message || "Failed to verify medicine with CDSCO.");
+    } finally {
+      // 5. Always turn off the loader when it finishes
+      setIsVerifying(false);
+    }
+  };
+  
 
     const handleScanAgain = async () => {
         if (ocrWorkerRef.current) {
@@ -998,7 +1012,13 @@ export default function ScanPage() {
             <div className="relative flex flex-1 items-center justify-center">
                 <div className="absolute inset-0 overflow-hidden bg-slate-900">
                     {isCameraActive ? (
-                        <BarcodeScanner onScan={handleBarcodeScan} debounceMs={2500} />
+                        <BarcodeScanner 
+  onScan={handleBarcodeScan} 
+  debounceMs={2500} 
+  isVerifying={isVerifying} 
+  apiError={apiError} 
+  onRetry={() => setApiError(null)} 
+/>
                     ) : uploadedImage ? (
                         <LazyImage
                             src={uploadedImage}
