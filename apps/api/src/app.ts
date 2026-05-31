@@ -4,7 +4,6 @@ import path from "path";
 import logger from "./utils/logger";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./utils/swagger";
-import batchRouter from "./routes/batch";
 
 const rootEnvPath = path.resolve(__dirname, "../../../.env");
 dotenv.config({ path: rootEnvPath });
@@ -33,6 +32,7 @@ import { requireAuth, requireRole } from "./middleware/auth";
 import reportsRouter from "./routes/reports";
 import pharmaciesRouter from "./routes/pharmacies";
 import verifyRouter from "./routes/verify";
+import batchRouter from "./routes/batch";
 import analyticsRoutes from "./routes/analytics";
 import notificationsRouter from "./routes/notifications";
 import scanRouter from "./routes/scan";
@@ -60,7 +60,6 @@ app.use(
 app.use(cors(createCorsOptions()));
 
 app.use(express.json({ limit: "1mb" }));
-
 
 app.use(
     morgan((tokens, req: Request, res: Response) => {
