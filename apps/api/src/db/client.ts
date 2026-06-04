@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import logger from "../utils/logger";
+import { CONNECTION_TIMEOUT_MS, MAX_RETRIES, RETRY_DELAY_MS, fetchWithRetry } from "./fetchUtils";
 
 // ── Environment resolution ────────────────────────────────────────────────────
 
@@ -30,9 +31,6 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_CONNECTIONS = 20;          // max concurrent DB requests
 const IDLE_TIMEOUT_MS = 30_000;      // 30 s — matches pg idleTimeoutMillis
-const CONNECTION_TIMEOUT_MS = 2_000; // 2 s  — matches pg connectionTimeoutMillis
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 500;
 
 // ── Semaphore (concurrency limiter) ──────────────────────────────────────────
 
@@ -84,65 +82,6 @@ class ConnectionPool {
 }
 
 export const pool = new ConnectionPool(MAX_CONNECTIONS);
-
-// ── Fetch wrapper with timeout + retry ───────────────────────────────────────
-
-async function fetchWithTimeout(
-    input: RequestInfo | URL,
-    init?: RequestInit
-): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-        () => controller.abort(),
-        CONNECTION_TIMEOUT_MS
-    );
-
-    try {
-        const response = await fetch(input, {
-            ...init,
-            signal: controller.signal,
-        });
-        return response;
-    } catch (err) {
-        console.error(err)
-        if ((err as Error).name === "AbortError") {
-            throw new Error(
-                `Database request timed out after ${CONNECTION_TIMEOUT_MS}ms`
-            );
-        }
-        throw err;
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-async function fetchWithRetry(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-    retries = MAX_RETRIES
-): Promise<Response> {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            return await fetchWithTimeout(input, init);
-        } catch (err) {
-            console.error(err)
-            const isLast = attempt === retries;
-            const msg = err instanceof Error ? err.message : String(err);
-
-            if (isLast) {
-                logger.error(`DB fetch failed after ${retries} attempts: ${msg}`);
-                throw err;
-            }
-
-            logger.warn(
-                `DB fetch attempt ${attempt}/${retries} failed: ${msg}. Retrying in ${RETRY_DELAY_MS}ms...`
-            );
-            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
-        }
-    }
-    // unreachable but satisfies TypeScript
-    throw new Error("Unexpected retry loop exit");
-}
 
 // ── Pool-aware fetch ──────────────────────────────────────────────────────────
 
