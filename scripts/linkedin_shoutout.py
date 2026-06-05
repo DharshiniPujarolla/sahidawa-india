@@ -139,12 +139,31 @@ def evaluate_pr_impact(pr: dict) -> None:
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {"temperature": 0.0, "maxOutputTokens": 10},
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
     }
 
     try:
         resp = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=30)
         resp.raise_for_status()
-        verdict = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip().upper()
+        resp_json = resp.json()
+        
+        candidates = resp_json.get("candidates", [])
+        if not candidates:
+            raise KeyError("No candidates returned from Gemini API")
+            
+        candidate = candidates[0]
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        if not parts:
+            finish_reason = candidate.get("finishReason")
+            raise KeyError(f"No content parts returned. finishReason: {finish_reason}")
+            
+        verdict = parts[0].get("text", "").strip().upper()
         
         if "REJECT" in verdict:
             print(f"🛑 AI GATEKEEPER REJECTED: This PR appears to be trivial/bloat despite its size.")
@@ -205,6 +224,12 @@ def generate_post_with_gemini(pr: dict, tier_display: str, tier_desc: str) -> st
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {"temperature": 0.9, "maxOutputTokens": 400},
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
     }
 
     try:
@@ -212,7 +237,20 @@ def generate_post_with_gemini(pr: dict, tier_display: str, tier_desc: str) -> st
         resp = requests.post(url, headers={"Content-Type": "application/json"},
                              json=payload, timeout=30)
         resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        resp_json = resp.json()
+        
+        candidates = resp_json.get("candidates", [])
+        if not candidates:
+            raise KeyError("No candidates returned from Gemini API")
+            
+        candidate = candidates[0]
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        if not parts:
+            finish_reason = candidate.get("finishReason")
+            raise KeyError(f"No content parts returned. finishReason: {finish_reason}")
+            
+        text = parts[0].get("text", "").strip()
         print("✅ Gemini post generated successfully.")
         return text
     except Exception as exc:
